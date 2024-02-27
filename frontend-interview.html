@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interview</title>
+    <style>
+      body {
+        background-color: #f6f9fc;
+        font-family: "Arial", sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      #wrapper {
+        display: flex;
+      }
+
+      .control-panel {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+      }
+
+      .control-panel button {
+        width: 100%;
+        max-width: 220px;
+        height: 40px;
+        color: green;
+        border-radius: 10px;
+        box-shadow: 0px 1px 2px rgba(0, 0, 0, 20%);
+        cursor: pointer;
+        border: none;
+        margin-right: 20px;
+        background-color: white;
+        font-weight: 600;
+      }
+
+      h1 {
+        text-align: center;
+        margin: 20px 0;
+        color: green;
+      }
+
+      .category {
+        padding: 20px;
+        width: 30%;
+        margin: 10px;
+      }
+
+      .question {
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        margin-bottom: 10px;
+        background-color: #fff;
+        border-radius: 10px;
+        position: relative;
+        padding-left: 10px;
+        box-shadow: 0px 1px 2px rgba(0, 0, 0, 20%);
+      }
+
+      .status {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 10px;
+      }
+
+      h3 {
+        color: green;
+        cursor: pointer;
+        transition: color 0.3s;
+        font-size: 1rem;
+      }
+
+      .draggable-area {
+        width: 30px;
+        cursor: move;
+        background-color: darkgreen;
+        height: 100%;
+        min-height: 50px;
+        border-radius: 0 10px 10px 0;
+        position: absolute;
+        right: 0;
+      }
+
+      .status.correct {
+        background: linear-gradient(#04ff00, #369536);
+      }
+
+      .status.partially_correct {
+        background: linear-gradient(#fbf82b, #ffc63b);
+      }
+
+      .status.incorrect {
+        background: linear-gradient(#ff0000, #760000);
+      }
+
+      .status.unattempted {
+        border: 1px solid #6772e54d;
+      }
+
+      .star-icon,
+      .strike-icon {
+        width: 18px;
+      }
+
+      .star-icon {
+        margin-right: 5px;
+        color: #ffd700;
+        padding-left: 12px;
+      }
+
+      .strikethrough {
+        text-decoration: line-through;
+        color: #999;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Interview Questions</h1>
+    <div class="control-panel">
+      <button id="groupCategory" onclick="groupQuestions(false)">
+        Group by Category
+      </button>
+      <button id="groupRandomly" onclick="groupQuestions(true)">
+        Group Randomly
+      </button>
+    </div>
+    <div id="wrapper">
+      <!-- content  -->
+    </div>
+
+    <script>
+      let dragSrcEl = null;
+
+      function handleDragStart(e) {
+        dragSrcEl = this;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", this.innerHTML);
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        return false;
+      }
+
+      function handleDragEnter(e) {
+        this.classList.add("over");
+      }
+
+      function handleDragLeave(e) {
+        this.classList.remove("over");
+      }
+
+      function handleDrop(e) {
+        e.stopPropagation();
+
+        if (dragSrcEl !== this) {
+          const newQuestion = dragSrcEl.cloneNode(true);
+
+          this.appendChild(newQuestion);
+          dragSrcEl.parentNode.removeChild(dragSrcEl);
+
+          this.classList.remove("over");
+        }
+
+        return false;
+      }
+
+      function handleDragEnd() {
+        const elements = document.querySelectorAll(".draggable");
+        elements.forEach((el) => el.classList.remove("over"));
+      }
+
+      let isRandomGrouping = false;
+      let questionsData;
+      let submissionsData;
+      let defaultGroupedData;
+
+      function groupQuestions(random) {
+        isRandomGrouping = random;
+        const dataToRender = isRandomGrouping
+          ? splitRandomly([...questionsData])
+          : defaultGroupedData;
+
+        renderQuestions(dataToRender);
+      }
+
+      function shuffle(array) {
+        let currentIndex = array.length,
+          randomIndex;
+
+        while (currentIndex !== 0) {
+          randomIndex = Math.floor(Math.random() * currentIndex);
+          currentIndex--;
+
+          [array[currentIndex], array[randomIndex]] = [
+            array[randomIndex],
+            array[currentIndex],
+          ];
+        }
+
+        return array;
+      }
+
+      function splitRandomly(questions) {
+        const numGroups = 4;
+        const groupedArrays = Array.from({ length: numGroups }, () => ({
+          questions: [],
+          completed: 0,
+        }));
+
+        questions.forEach((question, index) => {
+          const groupIndex = index % numGroups;
+          groupedArrays[groupIndex].questions.push(question);
+
+          const submission = submissionsData.find(
+            (sub) => sub.questionId === question.id
+          );
+          if (submission && submission.status.toLowerCase() === "correct") {
+            groupedArrays[groupIndex].completed += 1;
+          }
+        });
+
+        groupedArrays.forEach((group) => {
+          group.questions = shuffle(group.questions);
+        });
+
+        const result = {};
+
+        groupedArrays.forEach((group, index) => {
+          result[`Group ${index + 1}`] = group;
+        });
+
+        return result;
+      }
+
+      function renderQuestions(data) {
+        const wrapper = document.getElementById("wrapper");
+        wrapper.innerHTML = "";
+
+        Object.keys(data).forEach((categoryName) => {
+          const categoryDiv = document.createElement("div");
+          categoryDiv.classList.add("category");
+          categoryDiv.addEventListener("dragover", handleDragOver);
+          categoryDiv.addEventListener("drop", handleDrop);
+
+          const h2 = document.createElement("h2");
+          h2.textContent = `${categoryName} - ${data[categoryName].completed} / ${data[categoryName].questions.length}`;
+          categoryDiv.appendChild(h2);
+
+          data[categoryName].questions.forEach((question) => {
+            const questionDiv = document.createElement("div");
+            questionDiv.classList.add("question", "draggable");
+            questionDiv.setAttribute("draggable", true);
+            questionDiv.addEventListener("dragstart", handleDragStart);
+            questionDiv.addEventListener("dragenter", handleDragEnter);
+            questionDiv.addEventListener("dragleave", handleDragLeave);
+            questionDiv.addEventListener("dragend", handleDragEnd);
+
+            const submission = submissionsData.find(
+              (sub) => sub.questionId === question.id
+            );
+
+            const statusDiv = document.createElement("div");
+            statusDiv.classList.add(
+              "status",
+              submission ? submission.status.toLowerCase() : "unattempted"
+            );
+            questionDiv.appendChild(statusDiv);
+
+            const h3 = document.createElement("h3");
+            h3.innerHTML += question.name;
+            questionDiv.appendChild(h3);
+
+            const draggableArea = document.createElement("div");
+            draggableArea.classList.add("draggable-area");
+            questionDiv.appendChild(draggableArea);
+
+            let isDragging = false;
+            let initialX;
+            let initialY;
+
+            draggableArea.addEventListener("mousedown", (event) => {
+              isDragging = true;
+              initialX = event.clientX;
+              initialY = event.clientY;
+            });
+
+            document.addEventListener("mousemove", (event) => {
+              if (isDragging) {
+                const deltaX = event.clientX - initialX;
+                const deltaY = event.clientY - initialY;
+                questionDiv.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                questionDiv.style.zIndex = 2;
+              }
+            });
+
+            document.addEventListener("mouseup", () => {
+              if (isDragging) {
+                isDragging = false;
+                questionDiv.style.transform = "translate(0, 0)";
+                questionDiv.style.zIndex = 1;
+              }
+            });
+
+            categoryDiv.appendChild(questionDiv);
+
+            const starIcon = document.createElement("img");
+            starIcon.src = "star-empty.png";
+            starIcon.alt = "Star";
+            starIcon.classList.add("icon", "star-icon");
+
+            starIcon.addEventListener("click", () => {
+              question.starred = !question.starred;
+              starIcon.src = question.starred
+                ? "star-filled.png"
+                : "star-empty.png";
+            });
+
+            h3.appendChild(starIcon);
+
+            const strikethroughIcon = document.createElement("img");
+            strikethroughIcon.src = "strike.png";
+            strikethroughIcon.alt = "Strikethrough";
+            strikethroughIcon.classList.add("icon", "strike-icon");
+
+            strikethroughIcon.addEventListener("click", () => {
+              h3.classList.toggle("strikethrough");
+            });
+
+            h3.appendChild(strikethroughIcon);
+          });
+
+          wrapper.appendChild(categoryDiv);
+        });
+      }
+
+      Promise.all([fetch("questions.json"), fetch("submissions.json")])
+        .then((responses) => Promise.all(responses.map((res) => res.json())))
+        .then(([questions, submissions]) => {
+          questionsData = questions;
+          submissionsData = submissions;
+
+          defaultGroupedData = questions.reduce((acc, item) => {
+            if (!acc[item.category]) {
+              acc[item.category] = {
+                questions: [],
+                completed: 0,
+              };
+            }
+            acc[item.category].questions.push(item);
+            return acc;
+          }, {});
+
+          submissions.forEach((submission) => {
+            const category = questions.find(
+              (q) => q.id === submission.questionId
+            )?.category;
+            if (category && defaultGroupedData[category]) {
+              if (submission.status.toLowerCase() === "correct") {
+                defaultGroupedData[category].completed += 1;
+              }
+            }
+          });
+
+          renderQuestions(defaultGroupedData);
+        })
+        .catch((error) => console.error("Error fetching data:", error));
+    </script>
+  </body>
+</html>
